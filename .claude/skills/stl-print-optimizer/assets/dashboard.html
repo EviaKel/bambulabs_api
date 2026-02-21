@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STL Print Analysis — Bambu Lab</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --card: #1a1d27;
+    --border: #2a2d3a;
+    --text: #e4e6ed;
+    --muted: #8b8fa3;
+    --accent: #00d4aa;
+    --warn: #ffb224;
+    --danger: #ff4d6a;
+    --blue: #4da6ff;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    padding: 24px;
+    min-height: 100vh;
+  }
+  .header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 24px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid var(--border);
+  }
+  .header h1 { font-size: 24px; font-weight: 600; }
+  .header .file-name { color: var(--muted); font-size: 14px; margin-top: 4px; }
+  .status-badge {
+    padding: 6px 16px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+  .status-badge.pending { background: #ffb22433; color: var(--warn); }
+  .status-badge.approved { background: #00d4aa33; color: var(--accent); }
+  .status-badge.rejected { background: #ff4d6a33; color: var(--danger); }
+
+  .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+    gap: 16px;
+    margin-bottom: 24px;
+  }
+  .card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+  }
+  .card h2 {
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 16px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .card h2 .icon { font-size: 16px; }
+
+  .metric {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    padding: 8px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .metric:last-child { border-bottom: none; }
+  .metric .label { color: var(--muted); font-size: 13px; }
+  .metric .value { font-size: 15px; font-weight: 600; font-variant-numeric: tabular-nums; }
+  .metric .value.good { color: var(--accent); }
+  .metric .value.warn { color: var(--warn); }
+  .metric .value.bad { color: var(--danger); }
+
+  .bar-chart { margin-top: 12px; }
+  .bar-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 6px;
+    font-size: 12px;
+  }
+  .bar-label { width: 80px; text-align: right; color: var(--muted); flex-shrink: 0; }
+  .bar-track {
+    flex: 1;
+    height: 16px;
+    background: #252836;
+    border-radius: 4px;
+    overflow: hidden;
+  }
+  .bar-fill {
+    height: 100%;
+    border-radius: 4px;
+    background: linear-gradient(90deg, var(--accent), var(--blue));
+    transition: width 0.6s ease;
+  }
+  .bar-fill.warn { background: linear-gradient(90deg, var(--warn), #ff8c00); }
+  .bar-fill.bad { background: linear-gradient(90deg, var(--danger), #ff2040); }
+  .bar-value { width: 60px; font-variant-numeric: tabular-nums; }
+
+  .warnings {
+    background: #ff4d6a10;
+    border: 1px solid #ff4d6a33;
+    border-radius: 8px;
+    padding: 16px;
+    margin-bottom: 24px;
+  }
+  .warnings h3 { color: var(--danger); font-size: 14px; margin-bottom: 10px; }
+  .warnings ul { list-style: none; padding: 0; }
+  .warnings li {
+    padding: 6px 0;
+    font-size: 13px;
+    color: var(--text);
+    border-bottom: 1px solid #ff4d6a15;
+  }
+  .warnings li:last-child { border: none; }
+  .warnings li::before { content: "! "; color: var(--danger); font-weight: 700; }
+
+  .settings-card {
+    background: linear-gradient(135deg, #1a2a1f, #1a1d27);
+    border: 1px solid #00d4aa33;
+  }
+  .setting-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .setting-row:last-child { border: none; }
+  .setting-name { font-size: 13px; color: var(--muted); }
+  .setting-value {
+    font-size: 15px;
+    font-weight: 600;
+    color: var(--accent);
+    background: #00d4aa15;
+    padding: 4px 12px;
+    border-radius: 6px;
+  }
+
+  .actions {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    padding: 24px 0;
+    border-top: 1px solid var(--border);
+  }
+  .btn {
+    padding: 12px 40px;
+    border-radius: 8px;
+    font-size: 15px;
+    font-weight: 600;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .btn-approve {
+    background: var(--accent);
+    color: #0f1117;
+  }
+  .btn-approve:hover { background: #00eabb; transform: translateY(-1px); }
+  .btn-reject {
+    background: transparent;
+    color: var(--danger);
+    border: 1px solid var(--danger);
+  }
+  .btn-reject:hover { background: #ff4d6a15; }
+  .btn-rerun {
+    background: transparent;
+    color: var(--blue);
+    border: 1px solid var(--blue);
+  }
+  .btn-rerun:hover { background: #4da6ff15; }
+
+  .summary-bar {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 16px 24px;
+    margin-bottom: 24px;
+    font-size: 15px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+  }
+  .summary-bar .dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+  .dot.green { background: var(--accent); }
+  .dot.yellow { background: var(--warn); }
+  .dot.red { background: var(--danger); }
+
+  #loading {
+    text-align: center;
+    padding: 80px 20px;
+    color: var(--muted);
+    font-size: 16px;
+  }
+  #loading .spinner {
+    width: 40px; height: 40px;
+    border: 3px solid var(--border);
+    border-top-color: var(--accent);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin: 0 auto 16px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .orientation-viz {
+    text-align: center;
+    padding: 12px;
+    font-family: monospace;
+    font-size: 12px;
+    color: var(--muted);
+    background: #0d0f14;
+    border-radius: 8px;
+    margin-top: 12px;
+  }
+
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+
+<div id="loading">
+  <div class="spinner"></div>
+  Waiting for analysis data...
+</div>
+
+<div id="dashboard" class="hidden">
+  <div class="header">
+    <div>
+      <h1>STL Print Analysis</h1>
+      <div class="file-name" id="fileName">—</div>
+    </div>
+    <div class="status-badge pending" id="statusBadge">PENDING APPROVAL</div>
+  </div>
+
+  <div class="summary-bar" id="summaryBar">
+    <div class="dot yellow"></div>
+    <span id="summaryText">Analyzing...</span>
+  </div>
+
+  <div id="warningsSection" class="warnings hidden">
+    <h3>Warnings</h3>
+    <ul id="warningsList"></ul>
+  </div>
+
+  <div class="grid">
+    <!-- Dimensions -->
+    <div class="card">
+      <h2><span class="icon">&#x25A1;</span> Dimensions</h2>
+      <div id="dimensionsMetrics"></div>
+    </div>
+
+    <!-- Centroid -->
+    <div class="card">
+      <h2><span class="icon">&#x2295;</span> Center of Mass</h2>
+      <div id="centroidMetrics"></div>
+    </div>
+
+    <!-- Overhangs -->
+    <div class="card">
+      <h2><span class="icon">&#x25B3;</span> Overhang Analysis</h2>
+      <div id="overhangMetrics"></div>
+      <div class="bar-chart" id="overhangBars"></div>
+    </div>
+
+    <!-- Thin Walls -->
+    <div class="card">
+      <h2><span class="icon">&#x2758;</span> Thin Wall Detection</h2>
+      <div id="thinWallMetrics"></div>
+    </div>
+
+    <!-- Support Estimate -->
+    <div class="card">
+      <h2><span class="icon">&#x2AE8;</span> Support Estimate</h2>
+      <div id="supportMetrics"></div>
+    </div>
+
+    <!-- Orientation -->
+    <div class="card">
+      <h2><span class="icon">&#x21BB;</span> Optimal Orientation</h2>
+      <div id="orientationMetrics"></div>
+      <div class="orientation-viz" id="orientationViz"></div>
+    </div>
+  </div>
+
+  <!-- Recommended Settings -->
+  <div class="card settings-card" style="margin-bottom: 24px;">
+    <h2><span class="icon">&#x2699;</span> Recommended Print Settings</h2>
+    <div id="settingsRows"></div>
+  </div>
+
+  <!-- Approval Actions -->
+  <div class="actions">
+    <button class="btn btn-reject" onclick="handleReject()">Reject</button>
+    <button class="btn btn-rerun" onclick="handleRerun()">Re-analyze</button>
+    <button class="btn btn-approve" onclick="handleApprove()">Approve Settings</button>
+  </div>
+</div>
+
+<script>
+// The analysis data will be injected here by the skill runner
+let analysisData = null;
+let approvalStatus = 'pending';
+
+function renderMetrics(containerId, metrics) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = metrics.map(m => `
+    <div class="metric">
+      <span class="label">${m.label}</span>
+      <span class="value ${m.cls || ''}">${m.value}</span>
+    </div>
+  `).join('');
+}
+
+function renderBarChart(containerId, bars, maxVal) {
+  const el = document.getElementById(containerId);
+  el.innerHTML = bars.map(b => {
+    const pct = Math.min((b.value / maxVal) * 100, 100);
+    const cls = pct > 60 ? 'bad' : pct > 30 ? 'warn' : '';
+    return `
+      <div class="bar-row">
+        <span class="bar-label">${b.label}</span>
+        <div class="bar-track"><div class="bar-fill ${cls}" style="width:${pct}%"></div></div>
+        <span class="bar-value">${b.display}</span>
+      </div>
+    `;
+  }).join('');
+}
+
+function loadData(data) {
+  analysisData = data;
+  document.getElementById('loading').classList.add('hidden');
+  document.getElementById('dashboard').classList.remove('hidden');
+
+  // File name
+  document.getElementById('fileName').textContent = data._stl_path || 'Unknown file';
+
+  // Summary
+  const summaryDot = document.querySelector('.summary-bar .dot');
+  const warnings = data.warnings || [];
+  if (warnings.length === 0) {
+    summaryDot.className = 'dot green';
+  } else if (warnings.length <= 2) {
+    summaryDot.className = 'dot yellow';
+  } else {
+    summaryDot.className = 'dot red';
+  }
+  document.getElementById('summaryText').textContent = data.summary || 'Analysis complete.';
+
+  // Warnings
+  if (warnings.length > 0) {
+    const ws = document.getElementById('warningsSection');
+    ws.classList.remove('hidden');
+    document.getElementById('warningsList').innerHTML =
+      warnings.map(w => `<li>${w}</li>`).join('');
+  }
+
+  // Dimensions
+  const dims = data.dimensions || {};
+  const d = dims.dimensions_mm || {};
+  renderMetrics('dimensionsMetrics', [
+    { label: 'Width', value: `${(d.width || 0).toFixed(1)} mm` },
+    { label: 'Depth', value: `${(d.depth || 0).toFixed(1)} mm` },
+    { label: 'Height', value: `${(d.height || 0).toFixed(1)} mm` },
+    { label: 'Surface area', value: `${(dims.surface_area_mm2 || 0).toFixed(0)} mm²` },
+    { label: 'Volume', value: `${(dims.volume_mm3 || 0).toFixed(0)} mm³` },
+    { label: 'Aspect ratio', value: (dims.aspect_ratio || 0).toFixed(1), cls: dims.aspect_ratio > 3 ? 'warn' : '' },
+    { label: 'Fits bed', value: dims.fits_bed ? 'YES' : 'NO', cls: dims.fits_bed ? 'good' : 'bad' },
+  ]);
+
+  // Centroid
+  const cent = data.centroid || {};
+  const c = cent.centroid || [0,0,0];
+  renderMetrics('centroidMetrics', [
+    { label: 'X', value: `${c[0].toFixed(2)} mm` },
+    { label: 'Y', value: `${c[1].toFixed(2)} mm` },
+    { label: 'Z', value: `${c[2].toFixed(2)} mm` },
+    { label: 'Volume', value: `${(cent.volume_mm3 || 0).toFixed(0)} mm³` },
+    { label: 'Faces', value: (cent.face_count || 0).toLocaleString() },
+    { label: 'Method', value: cent.method || '—' },
+  ]);
+
+  // Overhangs
+  const oh = data.overhang_analysis || {};
+  renderMetrics('overhangMetrics', [
+    { label: 'Severity', value: (oh.severity || '—').toUpperCase(),
+      cls: oh.severity === 'high' ? 'bad' : oh.severity === 'medium' ? 'warn' : 'good' },
+    { label: 'Overhang area', value: `${(oh.overhang_area_pct || 0).toFixed(1)}%`,
+      cls: oh.overhang_area_pct > 20 ? 'bad' : oh.overhang_area_pct > 10 ? 'warn' : 'good' },
+    { label: 'Max bridge', value: `${(oh.max_bridge_mm || 0).toFixed(1)} mm`,
+      cls: oh.max_bridge_mm > 10 ? 'warn' : '' },
+  ]);
+
+  // Thin walls
+  const tw = data.thin_wall_analysis || {};
+  renderMetrics('thinWallMetrics', [
+    { label: 'Thin walls found', value: tw.has_thin_walls ? 'YES' : 'NO',
+      cls: tw.has_thin_walls ? 'warn' : 'good' },
+    { label: 'Min thickness', value: tw.min_thickness_mm ? `${tw.min_thickness_mm.toFixed(2)} mm` : 'N/A',
+      cls: tw.min_thickness_mm && tw.min_thickness_mm < 0.4 ? 'bad' : '' },
+    { label: 'Thin area', value: `${(tw.thin_area_pct || 0).toFixed(1)}%` },
+    { label: 'Regions', value: tw.region_count || 0 },
+  ]);
+
+  // Support
+  const sup = data.support_estimate || {};
+  renderMetrics('supportMetrics', [
+    { label: 'Support volume', value: `${(sup.volume_mm3 || 0).toFixed(0)} mm³` },
+    { label: 'Filament', value: `${(sup.filament_m || 0).toFixed(2)} m` },
+    { label: 'Est. time', value: `${(sup.time_min || 0).toFixed(0)} min` },
+    { label: 'Support/part ratio', value: `${((sup.ratio || 0) * 100).toFixed(1)}%`,
+      cls: sup.ratio > 0.3 ? 'warn' : '' },
+  ]);
+
+  // Orientation
+  const ori = data.recommended_orientation || {};
+  const euler = ori.euler_angles_deg || {};
+  renderMetrics('orientationMetrics', [
+    { label: 'Rotation X', value: `${(euler.x || 0).toFixed(1)}°` },
+    { label: 'Rotation Y', value: `${(euler.y || 0).toFixed(1)}°` },
+    { label: 'Rotation Z', value: `${(euler.z || 0).toFixed(1)}°` },
+    { label: 'Bed contact', value: `${(ori.bed_contact_area_mm2 || 0).toFixed(0)} mm²` },
+    { label: 'Overhang area', value: `${(ori.overhang_area_mm2 || 0).toFixed(0)} mm²` },
+    { label: 'Score', value: (ori.score || 0).toFixed(4), cls: 'good' },
+  ]);
+
+  // Settings
+  const sets = data.recommended_settings || {};
+  const settingsEl = document.getElementById('settingsRows');
+  const settingItems = [
+    ['Layer height', `${sets.layer_height_mm || 0.2} mm`],
+    ['Support type', (sets.support_type || 'none').toUpperCase()],
+    ['Support density', sets.support_density_pct ? `${sets.support_density_pct}%` : 'N/A'],
+    ['Infill', `${sets.infill_pct || 15}%`],
+    ['Print speed', sets.print_speed || 'normal'],
+  ];
+  settingsEl.innerHTML = settingItems.map(([name, val]) => `
+    <div class="setting-row">
+      <span class="setting-name">${name}</span>
+      <span class="setting-value">${val}</span>
+    </div>
+  `).join('');
+}
+
+function handleApprove() {
+  approvalStatus = 'approved';
+  const badge = document.getElementById('statusBadge');
+  badge.textContent = 'APPROVED';
+  badge.className = 'status-badge approved';
+  window.__approval = { status: 'approved', data: analysisData, timestamp: Date.now() };
+}
+
+function handleReject() {
+  approvalStatus = 'rejected';
+  const badge = document.getElementById('statusBadge');
+  badge.textContent = 'REJECTED';
+  badge.className = 'status-badge rejected';
+  window.__approval = { status: 'rejected', data: analysisData, timestamp: Date.now() };
+}
+
+function handleRerun() {
+  window.__approval = { status: 'rerun', data: analysisData, timestamp: Date.now() };
+}
+
+// Expose for external injection
+window.loadAnalysisData = loadData;
+window.__approval = { status: 'pending' };
+</script>
+</body>
+</html>
